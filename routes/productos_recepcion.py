@@ -1,13 +1,14 @@
+# routes/productos_recepcion.py
 from flask import Blueprint, jsonify
 from odoo_connector import models, ODOO_DB, ODOO_PASSWORD, uid
 
 productos_recepcion_bp = Blueprint('productos_recepcion', __name__)
 
-@productos_recepcion_bp.route('/recepciones/<string:nombre_recepcion>/productos', methods=['GET'])
+# Aquí está la modificación clave: cambiar <string:...> por <path:...>
+@productos_recepcion_bp.route('/recepciones/<path:nombre_recepcion>/productos', methods=['GET'])
 def listar_productos_recepcion(nombre_recepcion):
     """Obtiene los productos únicos de una recepción específica"""
     try:
-        # Buscar la recepción específica por nombre
         recepcion = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking', 'search_read',
@@ -20,7 +21,6 @@ def listar_productos_recepcion(nombre_recepcion):
 
         recepcion_id = recepcion[0]['id']
 
-        # Obtener todos los movimientos de stock asociados a esta recepción
         movimientos = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.move', 'search_read',
@@ -29,12 +29,9 @@ def listar_productos_recepcion(nombre_recepcion):
         )
 
         if not movimientos:
-            return jsonify([])  # No hay movimientos asociados
+            return jsonify([])
 
-        # Extraer nombres únicos de productos
         productos_unicos = list({mov['product_id'][1] for mov in movimientos if mov.get('product_id')})
-
-        # Ordenar alfabéticamente
         productos_unicos.sort()
 
         return jsonify(productos_unicos)
