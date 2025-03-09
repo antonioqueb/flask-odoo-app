@@ -31,9 +31,9 @@ app = Flask(__name__)
 
 @app.route('/recepciones', methods=['GET'])
 def listar_recepciones():
-    """Obtiene todas las órdenes de recepción desde Odoo y las ordena de mayor a menor por el número final"""
+    """Obtiene todas las órdenes de recepción que contengan productos con 'ROLLO' desde Odoo"""
     try:
-        # Obtener el ID del tipo de picking "Recepciones"
+        # Obtener los ID del tipo de picking "Recepciones" (incoming)
         picking_type_ids = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking.type', 'search_read',
@@ -45,18 +45,35 @@ def listar_recepciones():
         if not picking_type_ids:
             return jsonify({'error': 'No se encontraron tipos de picking para recepciones'}), 404
 
-        # Buscar todas las recepciones en stock.picking
+        # Obtener los IDs de `stock.picking` (recepciones)
         recepciones = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking', 'search_read',
-            [[('picking_type_id', 'in', picking_type_ids)]],  # Buscar en todos los tipos de recepción
-            {'fields': ['name'], 'limit': False}  # Sin límite para traer todas
+            [[('picking_type_id', 'in', picking_type_ids)]],  # Solo recepciones
+            {'fields': ['id', 'name'], 'limit': False}  # Obtener ID y nombre
         )
 
-        # Extraer los nombres
-        resultado = [rec['name'] for rec in recepciones]
+        if not recepciones:
+            return jsonify([])  # No hay recepciones
 
-        # Función para extraer los números del final del string
+        # Obtener los IDs de recepciones
+        recepcion_ids = [rec['id'] for rec in recepciones]
+
+        # Obtener movimientos de stock que contengan "ROLLO" en el producto
+        movimientos = models.execute_kw(
+            ODOO_DB, uid, ODOO_PASSWORD,
+            'stock.move', 'search_read',
+            [[('picking_id', 'in', recepcion_ids), ('product_id', 'ilike', 'ROLLO')]],
+            {'fields': ['picking_id'], 'limit': False}
+        )
+
+        # Obtener los IDs de recepciones que contienen productos con "ROLLO"
+        recepciones_con_rollo = {mov['picking_id'][0] for mov in movimientos if mov.get('picking_id')}
+
+        # Filtrar las recepciones que cumplen con el criterio
+        resultado = [rec['name'] for rec in recepciones if rec['id'] in recepciones_con_rollo]
+
+        # Función para extraer los números finales de los nombres
         def extraer_numero(name):
             match = re.search(r'(\d+)$', name)  # Busca el número al final
             return int(match.group(0)) if match else 0  # Convierte a entero
