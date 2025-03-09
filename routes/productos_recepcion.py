@@ -42,10 +42,10 @@ def listar_productos_recepcion(nombre_recepcion):
                 ODOO_DB, uid, ODOO_PASSWORD,
                 'stock.move.line', 'search_read',
                 [[('move_id', '=', move_id)]],
-                {'fields': ['qty_done'], 'limit': False}
+                {'fields': ['quantity'], 'limit': False}
             )
 
-            cantidad_realizada = sum(linea['qty_done'] for linea in move_lines)
+            cantidad_realizada = sum(linea['quantity'] for linea in move_lines)
 
             if producto_nombre not in productos_agrupados:
                 productos_agrupados[producto_nombre] = {
