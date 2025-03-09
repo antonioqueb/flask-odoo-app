@@ -5,13 +5,13 @@ productos_recepcion_bp = Blueprint('productos_recepcion', __name__)
 
 @productos_recepcion_bp.route('/recepciones/<path:nombre_recepcion>/productos', methods=['GET'])
 def listar_productos_recepcion(nombre_recepcion):
-    """Obtiene productos con cantidad demandada, cantidad recibida real, estado, scheduled_date y lotes de una recepción específica"""
+    """Obtiene productos con cantidad demandada, cantidad recibida real, estado, scheduled_date, origin y lotes de una recepción específica"""
     try:
         recepcion = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking', 'search_read',
             [[('name', '=', nombre_recepcion)]],
-            {'fields': ['id', 'scheduled_date'], 'limit': 1}
+            {'fields': ['id', 'scheduled_date', 'origin'], 'limit': 1}
         )
 
         if not recepcion:
@@ -19,6 +19,7 @@ def listar_productos_recepcion(nombre_recepcion):
 
         recepcion_id = recepcion[0]['id']
         scheduled_date = recepcion[0]['scheduled_date']
+        origin = recepcion[0]['origin']
 
         # Obtener movimientos asociados a la recepción
         movimientos = models.execute_kw(
@@ -55,6 +56,7 @@ def listar_productos_recepcion(nombre_recepcion):
                     'quantity': cantidad_realizada,
                     'estado': {mov['state']},
                     'scheduled_date': scheduled_date,
+                    'origin': origin,
                     'lotes': lotes  # Guardamos los lotes asociados
                 }
             else:
@@ -71,6 +73,7 @@ def listar_productos_recepcion(nombre_recepcion):
                 'quantity': prod['quantity'],
                 'estado': list(prod['estado'])[0] if len(prod['estado']) == 1 else list(prod['estado']),
                 'scheduled_date': prod['scheduled_date'],
+                'origin': prod['origin'],
                 'lotes': list(prod['lotes'])  # Convertimos a lista para JSON
             })
 
