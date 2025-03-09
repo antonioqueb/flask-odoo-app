@@ -47,7 +47,7 @@ def listar_productos_recepcion(nombre_recepcion):
                 }
             else:
                 productos_agrupados[clave]['product_uom_qty'] += mov['product_uom_qty']
-                productos_agrupados[clave]['quantity'] += mov['quantity_done']
+                productos_agrupados[clave]['quantity'] += mov['quantity']
                 productos_agrupados[clave]['estado'].add(mov['state'])
                 productos_agrupados[clave]['scheduled_date'].add(mov['date_expected'])
 
