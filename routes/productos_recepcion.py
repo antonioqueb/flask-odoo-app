@@ -5,7 +5,7 @@ productos_recepcion_bp = Blueprint('productos_recepcion', __name__)
 
 @productos_recepcion_bp.route('/recepciones/<path:nombre_recepcion>/productos', methods=['GET'])
 def listar_productos_recepcion(nombre_recepcion):
-    """Obtiene productos con cantidad demandada, cantidad recibida real, estado y scheduled_date de una recepción específica"""
+    """Obtiene productos con cantidad demandada, cantidad recibida real, estado, scheduled_date y lotes de una recepción específica"""
     try:
         recepcion = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
@@ -37,15 +37,16 @@ def listar_productos_recepcion(nombre_recepcion):
             move_id = mov['id']
             producto_nombre = mov['product_id'][1]
 
-            # Obtener cantidades reales recibidas desde stock.move.line
+            # Obtener cantidades reales recibidas desde stock.move.line junto con el lote
             move_lines = models.execute_kw(
                 ODOO_DB, uid, ODOO_PASSWORD,
                 'stock.move.line', 'search_read',
                 [[('move_id', '=', move_id)]],
-                {'fields': ['quantity'], 'limit': False}
+                {'fields': ['quantity', 'lot_id'], 'limit': False}
             )
 
             cantidad_realizada = sum(linea['quantity'] for linea in move_lines)
+            lotes = {linea['lot_id'][1] for linea in move_lines if linea['lot_id']}  # Capturar los lotes
 
             if producto_nombre not in productos_agrupados:
                 productos_agrupados[producto_nombre] = {
@@ -53,12 +54,14 @@ def listar_productos_recepcion(nombre_recepcion):
                     'product_uom_qty': mov['product_uom_qty'],
                     'quantity': cantidad_realizada,
                     'estado': {mov['state']},
-                    'scheduled_date': scheduled_date  # fecha de la recepción completa
+                    'scheduled_date': scheduled_date,
+                    'lotes': lotes  # Guardamos los lotes asociados
                 }
             else:
                 productos_agrupados[producto_nombre]['product_uom_qty'] += mov['product_uom_qty']
                 productos_agrupados[producto_nombre]['quantity'] += cantidad_realizada
                 productos_agrupados[producto_nombre]['estado'].add(mov['state'])
+                productos_agrupados[producto_nombre]['lotes'].update(lotes)
 
         resultado_final = []
         for prod in productos_agrupados.values():
@@ -67,7 +70,8 @@ def listar_productos_recepcion(nombre_recepcion):
                 'product_uom_qty': prod['product_uom_qty'],
                 'quantity': prod['quantity'],
                 'estado': list(prod['estado'])[0] if len(prod['estado']) == 1 else list(prod['estado']),
-                'scheduled_date': prod['scheduled_date']
+                'scheduled_date': prod['scheduled_date'],
+                'lotes': list(prod['lotes'])  # Convertimos a lista para JSON
             })
 
         resultado_final.sort(key=lambda x: x['producto'])
