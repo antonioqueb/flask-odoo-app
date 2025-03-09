@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  flask-odoo:
+    build: .
+    container_name: flask-odoo-app
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    restart: always
