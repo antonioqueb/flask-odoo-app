@@ -31,30 +31,30 @@ app = Flask(__name__)
 
 @app.route('/recepciones', methods=['GET'])
 def listar_recepciones():
-    """Obtiene todas las órdenes de recepción desde Odoo y las ordena de mayor a menor por el número final"""
+    """Obtiene todas las órdenes de recepción y salida desde Odoo y las ordena de mayor a menor por el número final"""
     try:
-        # Obtener el ID del tipo de picking "Recepciones"
-        picking_type_ids = models.execute_kw(
+        # Obtener los ID de los tipos de picking "incoming" (recepciones) y "outgoing" (envíos/salidas)
+        picking_types = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking.type', 'search_read',
-            [[('code', '=', 'incoming')]],
+            [[('code', 'in', ['incoming', 'outgoing'])]],  # Filtra IN y OUT
             {'fields': ['id'], 'limit': False}
         )
-        picking_type_ids = [pt['id'] for pt in picking_type_ids]
+        picking_type_ids = [pt['id'] for pt in picking_types]
 
         if not picking_type_ids:
-            return jsonify({'error': 'No se encontraron tipos de picking para recepciones'}), 404
+            return jsonify({'error': 'No se encontraron tipos de picking para recepciones y salidas'}), 404
 
-        # Buscar todas las recepciones en stock.picking
-        recepciones = models.execute_kw(
+        # Buscar todas las recepciones y salidas en stock.picking
+        recepciones_y_salidas = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking', 'search_read',
-            [[('picking_type_id', 'in', picking_type_ids)]],  # Buscar en todos los tipos de recepción
+            [[('picking_type_id', 'in', picking_type_ids)]],  # Buscar en ambos tipos
             {'fields': ['name'], 'limit': False}  # Sin límite para traer todas
         )
 
         # Extraer los nombres
-        resultado = [rec['name'] for rec in recepciones]
+        resultado = [rec['name'] for rec in recepciones_y_salidas]
 
         # Función para extraer los números del final del string
         def extraer_numero(name):
