@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 import xmlrpc.client
 import os
+import re
 from dotenv import load_dotenv
 
 # Cargar variables de entorno desde .env
@@ -30,20 +31,28 @@ app = Flask(__name__)
 
 @app.route('/recepciones', methods=['GET'])
 def listar_recepciones():
-    """Obtiene todas las órdenes de recepción desde Odoo"""
+    """Obtiene todas las órdenes de recepción desde Odoo y las ordena de mayor a menor por el número final"""
     try:
         # Filtra solo recepciones (picking_type_id con código 'incoming')
         recepciones = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking', 'search_read',
             [[('picking_type_id.code', '=', 'incoming')]],
-            {'fields': ['name']}
+            {'fields': ['name'], 'limit': False}  # Sin límite para traer todas
         )
 
-        # Extrae solo los nombres
+        # Extraer los nombres
         resultado = [rec['name'] for rec in recepciones]
 
-        return jsonify(resultado)
+        # Función para extraer los números del final del string
+        def extraer_numero(name):
+            match = re.search(r'(\d+)$', name)  # Busca el número al final
+            return int(match.group(0)) if match else 0  # Convierte a entero
+
+        # Ordenar la lista de mayor a menor según los números finales
+        resultado_ordenado = sorted(resultado, key=extraer_numero, reverse=True)
+
+        return jsonify(resultado_ordenado)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
