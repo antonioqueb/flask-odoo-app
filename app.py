@@ -33,11 +33,23 @@ app = Flask(__name__)
 def listar_recepciones():
     """Obtiene todas las órdenes de recepción desde Odoo y las ordena de mayor a menor por el número final"""
     try:
-        # Filtra solo recepciones (picking_type_id con código 'incoming')
+        # Obtener el ID del tipo de picking "Recepciones"
+        picking_type_ids = models.execute_kw(
+            ODOO_DB, uid, ODOO_PASSWORD,
+            'stock.picking.type', 'search_read',
+            [[('code', '=', 'incoming')]],
+            {'fields': ['id'], 'limit': False}
+        )
+        picking_type_ids = [pt['id'] for pt in picking_type_ids]
+
+        if not picking_type_ids:
+            return jsonify({'error': 'No se encontraron tipos de picking para recepciones'}), 404
+
+        # Buscar todas las recepciones en stock.picking
         recepciones = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking', 'search_read',
-            [[('picking_type_id.code', '=', 'incoming')]],
+            [[('picking_type_id', 'in', picking_type_ids)]],  # Buscar en todos los tipos de recepción
             {'fields': ['name'], 'limit': False}  # Sin límite para traer todas
         )
 
