@@ -7,7 +7,7 @@ recepciones_bp = Blueprint('recepciones', __name__)
 
 @recepciones_bp.route('/recepciones', methods=['GET'])
 def listar_recepciones():
-    """Obtiene todas las órdenes de recepción que contengan productos con 'ROLLO' desde Odoo"""
+    """Obtiene todas las órdenes de recepción que contengan productos con 'ROLLO' y que estén en estado 'hecho' desde Odoo"""
     try:
         # Obtener los ID del tipo de picking "Recepciones" (incoming)
         picking_type_ids = models.execute_kw(
@@ -21,18 +21,18 @@ def listar_recepciones():
         if not picking_type_ids:
             return jsonify({'error': 'No se encontraron tipos de picking para recepciones'}), 404
 
-        # Obtener los IDs de `stock.picking` (recepciones)
+        # Obtener los IDs de `stock.picking` (recepciones) que están en estado 'done'
         recepciones = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'stock.picking', 'search_read',
-            [[('picking_type_id', 'in', picking_type_ids)]],  # Solo recepciones
+            [[('picking_type_id', 'in', picking_type_ids), ('state', '=', 'done')]],  # Solo recepciones completadas
             {'fields': ['id', 'name'], 'limit': False}  # Obtener ID y nombre
         )
 
         if not recepciones:
-            return jsonify([])  # No hay recepciones
+            return jsonify([])  # No hay recepciones en estado 'done'
 
-        # Obtener los IDs de recepciones
+        # Obtener los IDs de recepciones completadas
         recepcion_ids = [rec['id'] for rec in recepciones]
 
         # Obtener movimientos de stock que contengan "ROLLO" en el producto
