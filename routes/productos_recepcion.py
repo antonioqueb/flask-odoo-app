@@ -5,7 +5,9 @@ productos_recepcion_bp = Blueprint('productos_recepcion', __name__)
 
 @productos_recepcion_bp.route('/recepciones/<path:nombre_recepcion>/productos', methods=['GET'])
 def listar_productos_recepcion(nombre_recepcion):
-    """Obtiene productos con cantidad demandada, cantidad recibida real, estado, scheduled_date, origin y lotes de una recepción específica"""
+    """Obtiene productos con cantidad demandada, cantidad recibida real, estado,
+    fecha programada, origen y detalle de lotes + cantidad recibida por cada lote
+    de una recepción específica."""
     try:
         recepcion = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
@@ -46,9 +48,17 @@ def listar_productos_recepcion(nombre_recepcion):
                 {'fields': ['quantity', 'lot_id'], 'limit': False}
             )
 
+            # Cantidad total recibida en este movimiento
             cantidad_realizada = sum(linea['quantity'] for linea in move_lines)
-            lotes = {linea['lot_id'][1] for linea in move_lines if linea['lot_id']}  # Capturar los lotes
 
+            # Diccionario para almacenar (lote -> cantidad)
+            lotes_cantidades = {}
+            for linea in move_lines:
+                if linea['lot_id']:  # lot_id es un array [id, "nombre_lote"]
+                    lote_nombre = linea['lot_id'][1]
+                    lotes_cantidades[lote_nombre] = lotes_cantidades.get(lote_nombre, 0.0) + linea['quantity']
+
+            # Si aún no existe el producto en el diccionario, lo creamos
             if producto_nombre not in productos_agrupados:
                 productos_agrupados[producto_nombre] = {
                     'producto': producto_nombre,
@@ -57,26 +67,48 @@ def listar_productos_recepcion(nombre_recepcion):
                     'estado': {mov['state']},
                     'scheduled_date': scheduled_date,
                     'origin': origin,
-                    'lotes': lotes  # Guardamos los lotes asociados
+                    'lotes_cantidades': lotes_cantidades
                 }
             else:
+                # Sumamos cantidades demandadas y recibidas
                 productos_agrupados[producto_nombre]['product_uom_qty'] += mov['product_uom_qty']
                 productos_agrupados[producto_nombre]['quantity'] += cantidad_realizada
                 productos_agrupados[producto_nombre]['estado'].add(mov['state'])
-                productos_agrupados[producto_nombre]['lotes'].update(lotes)
 
+                # Unificamos las cantidades por lote
+                for nombre_lote, cant in lotes_cantidades.items():
+                    productos_agrupados[producto_nombre]['lotes_cantidades'][nombre_lote] = (
+                        productos_agrupados[producto_nombre]['lotes_cantidades'].get(nombre_lote, 0.0) + cant
+                    )
+
+        # Construimos el resultado final
         resultado_final = []
         for prod in productos_agrupados.values():
+            # Convertimos el diccionario de lotes en una lista de objetos con { 'lote': '...', 'cantidad': ... }
+            lotes_list = []
+            for lote, cant in prod['lotes_cantidades'].items():
+                lotes_list.append({
+                    'lote': lote,
+                    'cantidad': cant
+                })
+
+            # Para el estado, si hay uno solo en el set, lo mostramos directamente.
+            # Si son varios, los convertimos en lista.
+            estado_final = list(prod['estado'])
+            if len(estado_final) == 1:
+                estado_final = estado_final[0]
+
             resultado_final.append({
                 'producto': prod['producto'],
                 'product_uom_qty': prod['product_uom_qty'],
                 'quantity': prod['quantity'],
-                'estado': list(prod['estado'])[0] if len(prod['estado']) == 1 else list(prod['estado']),
+                'estado': estado_final,
                 'scheduled_date': prod['scheduled_date'],
                 'origin': prod['origin'],
-                'lotes': list(prod['lotes'])  # Convertimos a lista para JSON
+                'lotes': lotes_list
             })
 
+        # Ordenamos por nombre de producto
         resultado_final.sort(key=lambda x: x['producto'])
 
         return jsonify(resultado_final)
